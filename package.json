@@ -1,0 +1,21 @@
+{
+  "type": "module",
+  "name": "biconomyaa",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@biconomy/account": "^4.5.7",
+    "@biconomy/bundler": "^3.1.4",
+    "@biconomy/paymaster": "^3.1.4",
+    "axios": "^1.8.4",
+    "dotenv": "^16.5.0",
+    "ethers": "^5.8.0"
+  }
+}
