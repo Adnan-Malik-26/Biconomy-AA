@@ -1,9 +1,6 @@
 import "dotenv/config";
 import { JsonRpcProvider, Wallet, formatEther } from "ethers";
-import {
-  BiconomySmartAccountV2,
-  DEFAULT_ENTRYPOINT_ADDRESS,
-} from "@biconomy/account";
+import { BiconomySmartAccountV2 } from "@biconomy/account";
 
 async function main() {
   const { PRIVATE_KEY, RPC_URL, BICONOMY_API_KEY } = process.env;
@@ -35,11 +32,11 @@ async function main() {
       signer: wallet,
       chainId: 97, // BNB Testnet
       bundlerUrl: `https://bundler.biconomy.io/api/v2/97/${BICONOMY_API_KEY}`,
-      entryPointAddress: DEFAULT_ENTRYPOINT_ADDRESS,
+      entryPointAddress: "0x5eA3998a3db4Bd420baFE11A8d2c5DdaD1e9Cbb2", // Example Entry Point Address
     });
 
-    // Attempt to get the counterfactual address
-    const saAddress = await smartAccount.getAccountAddress();
+    // Directly use the signer address for your smart account
+    const saAddress = wallet.address; // Use the wallet's address directly
     console.log(`\n📦 Smart Account Address: ${saAddress}`);
   } catch (error) {
     console.error("❌ Error during Smart Account setup:", error.message);
