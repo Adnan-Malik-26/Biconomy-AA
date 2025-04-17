@@ -1,6 +1,5 @@
 {
-  "type": "module",
-  "name": "biconomyaa",
+  "name": "erc4337-bnb-testnet",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,12 +9,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "type": "module",
   "dependencies": {
     "@biconomy/account": "^4.5.7",
-    "@biconomy/bundler": "^3.1.4",
-    "@biconomy/paymaster": "^3.1.4",
-    "axios": "^1.8.4",
+    "@biconomy/mexa": "^3.0.6",
     "dotenv": "^16.5.0",
-    "ethers": "^5.8.0"
+    "ethers": "^6.13.5"
   }
 }
