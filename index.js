@@ -1,105 +1,67 @@
-import axios from "axios";
 import { ethers } from "ethers";
 import dotenv from "dotenv";
+import { createSmartAccountClient } from "@biconomy/account";
+import { BiconomyPaymaster } from "@biconomy/paymaster";
 
 dotenv.config();
 
 const BNB_TESTNET_RPC = "https://data-seed-prebsc-1-s1.binance.org:8545";
 const ENTRY_POINT = "0x9406Cc6185a346906296840746125a0E44976454";
-const SMART_ACCOUNT = "0x11946976446Ce11a8996D6afc390166d311E8eE8";
-const BUNDLER_URL = "https://bundler.biconomy.io/api/v2/97/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44";
-const PAYMASTER_URL = `https://paymaster.biconomy.io/api/v2/97/${process.env.BICONOMY_PAYMASTER_API_KEY}`;
 
-const provider = new ethers.providers.JsonRpcProvider(BNB_TESTNET_RPC);
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const main = async () => {
+  try {
+    const provider = new ethers.providers.JsonRpcProvider(BNB_TESTNET_RPC);
+    const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-const dummySignature =
-  "0x00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000001c5b32F37F5beA87BDD5374eB2aC54eA8e000000000000000000000000000000000000000000000000000000000000004181d4b4981670cb18f99f0b4a66446df1bf5b204d24cfcb659bf38ba27a4359b5711649ec2423c5e1247245eba2964679b6a1dbb85c992ae40b9b00c6935b02ff1b00000000000000000000000000000000000000000000000000000000000000";
+    const smartAccount = await createSmartAccountClient({
+      signer,
+      chainId: 97,
+      bundlerUrl:
+        "https://bundler.biconomy.io/api/v3/97/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44",
+      entryPointAddress: ENTRY_POINT,
+    });
 
-async function main() {
-  const partialUserOp = {
-    sender: SMART_ACCOUNT,
-    nonce: "0x0", // You can fetch real nonce using smart contract if needed
-    initCode: "0x",
-    callData:
-      "0x", // Replace this with ABI-encoded function call data (e.g., ERC20.transfer)
-    paymasterAndData: "0x",
-    signature: dummySignature,
-  };
+    const smartAccountAddress = await smartAccount.getAddress();
+    console.log("✅ Smart Account Address:", smartAccountAddress);
 
-  // 1. Get Gas Fee Values
-  const { data: gasData } = await axios.post(BUNDLER_URL, {
-    jsonrpc: "2.0",
-    method: "biconomy_getGasFeeValues",
-    params: [],
-    id: Date.now(),
-  });
+    const tx = {
+      to: "0x34aC1D4FA2CFF01E82E8639115b421b5cbb194E6",
+      data: "0x",
+      value: ethers.utils.parseEther("0.0001"),
+    };
 
-  const { maxFeePerGas, maxPriorityFeePerGas } = gasData.result;
+    let userOp;
+    try {
+      userOp = await smartAccount.buildUserOp([tx]);
+    } catch (err) {
+      console.error("❌ Error building UserOp:", err);
+      return;
+    }
 
-  const userOp = {
-    ...partialUserOp,
-    callGasLimit: "500000",
-    verificationGasLimit: "500000",
-    preVerificationGas: "500000",
-    maxFeePerGas,
-    maxPriorityFeePerGas,
-  };
+    if (process.env.USE_PAYMASTER === "true") {
+      const paymaster = new BiconomyPaymaster({
+        paymasterUrl: `https://paymaster.biconomy.io/api/v2/97/${process.env.BICONOMY_PAYMASTER_API_KEY}`,
+      });
 
-  // 2. Get Sponsored Paymaster Data
-  const paymasterReq = {
-    jsonrpc: "2.0",
-    method: "pm_sponsorUserOperation",
-    id: Date.now(),
-    params: [
-      {
-        ...userOp,
-        paymasterAndData: "0x",
-        callGasLimit: userOp.callGasLimit.toString(),
-        verificationGasLimit: userOp.verificationGasLimit.toString(),
-        preVerificationGas: userOp.preVerificationGas.toString(),
-        maxFeePerGas: userOp.maxFeePerGas.toString(),
-        maxPriorityFeePerGas: userOp.maxPriorityFeePerGas.toString(),
-      },
-      {
-        mode: "SPONSORED",
-        sponsorshipInfo: {
-          webhookData: {},
-          smartAccountInfo: {
-            name: "BICONOMY",
-            version: "2.0.0",
-          },
-        },
-        expiryDuration: 300,
-        calculateGasLimits: true,
-      },
-    ],
-  };
+      try {
+        const paymasterData = await paymaster.getPaymasterAndData(userOp);
+        userOp.paymasterAndData = paymasterData.paymasterAndData;
+        console.log("🚀 Using Paymaster (gasless)");
+      } catch (err) {
+        console.error("❌ Paymaster error:", err);
+        return;
+      }
+    }
 
-  const {
-    data: {
-      result: {
-        paymasterAndData,
-        callGasLimit,
-        verificationGasLimit,
-        preVerificationGas,
-      },
-    },
-  } = await axios.post(PAYMASTER_URL, paymasterReq);
+    const userOpResponse = await smartAccount.sendUserOp(userOp);
+    console.log("📨 UserOp Hash:", userOpResponse.userOpHash);
 
-  const finalUserOp = {
-    ...userOp,
-    paymasterAndData,
-    callGasLimit: callGasLimit.toString(),
-    verificationGasLimit: verificationGasLimit.toString(),
-    preVerificationGas: preVerificationGas.toString(),
-  };
+    const txReceipt = await smartAccount.getUserOpReceipt(userOpResponse.userOpHash);
+    console.log("✅ Transaction Mined:", txReceipt?.receipt.transactionHash);
+  } catch (err) {
+    console.error("❌ Top-level error:", err);
+  }
+};
 
-  // 3. Sign UserOperation (using hash or contract call — not shown here)
-  // TODO: Implement signUserOp(finalUserOp)
-
-  console.log("📦 Final UserOp:", finalUserOp);
-}
-
-main().catch(console.error);
+main();
 
